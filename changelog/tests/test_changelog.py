@@ -186,7 +186,7 @@ class TestChangelog(TestCase):
         response.status_code = 200
         response.json.return_value = {
             "body": "Here comes the details of the PR",
-            "labels": ["test", "BREAKING"],
+            "labels": [{"name": "test"}, {"name": "BREAKING"}],
         }
         mock_requests_get.return_value = response
         result = get_pr_details(fake_github_config, "someone", "one-repo", "1")
@@ -284,7 +284,7 @@ class TestChangelog(TestCase):
             github_config, "owner", "a-repo", prs, markdown=True
         )
         expected = [
-            "PATCH RELEASE",
+            "MINOR RELEASE",
             "- first [#1](https://github.company.com/owner/a-repo/pull/1)",
             "- second [#2](https://github.company.com/owner/a-repo/pull/2)",
         ]
@@ -412,7 +412,7 @@ class TestChangelog(TestCase):
         get_pr_details_response = mock.MagicMock()
         get_pr_details_response.status_code = 200
         get_pr_details_response.json.return_value = {
-            "body": "My Title #10\n\nCHANGELOG: Specific ChangeLog description",
+            "body": "My Title #10\n\nCHANGELOG: Specific Changelog",
             "labels": [],
         }
         responses.append(get_pr_details_response)
@@ -452,10 +452,10 @@ class TestChangelog(TestCase):
         self.assertEqual(
             result,
             (
-                "PATCH RELEASE\n"
+                "MINOR RELEASE\n"
                 "- My Title #5\n"
                 "- Some title addresses bug #6\n"
                 "- My Title #9\n"
-                "- Specific ChangeLog description #10"
+                "- Specific Changelog #10"
             ),
         )

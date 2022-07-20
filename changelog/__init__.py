@@ -182,12 +182,14 @@ def get_pr_details(github_config, owner, repo, pr_number):
             )
         )
 
-    return PullRequestDetails(body=pr_json["body"], labels=pr_json["labels"])
+    labels = [label["name"] for label in pr_json["labels"]]
+
+    return PullRequestDetails(body=pr_json["body"], labels=labels)
 
 
 def extract_changelog(pr_body):
     """Extracts the Changelog from the PR Body"""
-    if pr_body == None:
+    if pr_body is None:
         return None
     try:
         changelog_match = CHANGELOG_RE.search(pr_body)
@@ -279,12 +281,17 @@ def format_changes(github_config, owner, repo, prs, markdown=False):
             number = "[{number}]({link})".format(number=number, link=link)
 
         pr_changelog_description = extract_changelog(extended_pr.details.body)
+
+        if len(extended_pr.details.labels or []) == 0:
+            change_level = min(change_level, 2)
+
         for label in extended_pr.details.labels or []:
-            change_level = min(change_level, LABEL_LEVELS[label])
+            change_level = min(change_level, LABEL_LEVELS.get(label) or 2)
+
         lines.append(
             "- {description} {number}".format(
                 description=pr_changelog_description
-                if pr_changelog_description != None
+                if pr_changelog_description is not None
                 else pr.title,
                 number=number,
             )
