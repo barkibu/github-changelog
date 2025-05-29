@@ -3,6 +3,7 @@
 This is a script to determine which PRs have been merges since the last
 release, or between two releases on the same branch.
 """
+
 from __future__ import print_function
 
 import argparse
@@ -11,7 +12,6 @@ import re
 from collections import namedtuple
 
 import requests
-
 
 DEFAULT_BRANCH = "main"
 PUBLIC_GITHUB_URL = "https://github.com"
@@ -25,9 +25,6 @@ ExtendedPullRequest = namedtuple("ExtendedPullRequest", ["pr", "details"])
 
 # Merge commits use a double linebreak between the branch name and the title
 MERGE_PR_RE = re.compile(r"^Merge pull request #([0-9]+) from .*\n\n(.*)")
-
-# Merge commits of a release branch
-MERGE_RELEASE_PR_RE = re.compile(r"^Merge pull request #([0-9]+) from .*/release/.*\n\n(.*)")
 
 # Squash-and-merge commits use the PR title with the number in parentheses
 SQUASH_PR_RE = re.compile(r"^(.*) \(#([0-9]+)\).*")
@@ -105,17 +102,13 @@ def get_commit_for_tag(github_config, owner, repo, tag):
 
 def get_last_commit(github_config, owner, repo, branch=DEFAULT_BRANCH):
     """Get the last commit sha for the given repo and branch"""
-    commits_url = "/".join(
-        [github_config.api_url, "repos", owner, repo, "commits"]
-    )
+    commits_url = "/".join([github_config.api_url, "repos", owner, repo, "commits"])
     commits_response = requests.get(
         commits_url, params={"sha": branch}, headers=github_config.headers
     )
     commits_json = commits_response.json()
     if commits_response.status_code != 200:
-        raise GitHubError(
-            "Unable to get commits. {}".format(commits_json["message"])
-        )
+        raise GitHubError("Unable to get commits. {}".format(commits_json["message"]))
 
     return commits_json[0]["sha"]
 
@@ -152,14 +145,11 @@ def get_commits_between(github_config, owner, repo, first_commit, last_commit):
 
     if "commits" not in commits_json:
         raise GitHubError(
-            "Commits not found between {} and {}.".format(
-                first_commit, last_commit
-            )
+            "Commits not found between {} and {}.".format(first_commit, last_commit)
         )
 
     commits = [
-        Commit(c["sha"], c["commit"]["message"])
-        for c in commits_json["commits"]
+        Commit(c["sha"], c["commit"]["message"]) for c in commits_json["commits"]
     ]
     return commits
 
@@ -180,14 +170,32 @@ def get_pr_details(github_config, owner, repo, pr_number):
     pr_json = pr_response.json()
     if pr_response.status_code != 200:
         raise GitHubError(
-            "Unable to get PR # {}. {}".format(
-                pr_number, pr_response["message"]
-            )
+            "Unable to get PR # {}. {}".format(pr_number, pr_response["message"])
         )
 
     labels = [label["name"] for label in pr_json["labels"]]
 
     return PullRequestDetails(body=pr_json["body"], labels=labels)
+
+
+def get_pr_for_commit(github_config, owner, repo, commit_sha):
+    """Get the PR associated with a commit using GitHub API"""
+    # Search for PRs that contain this commit
+    search_url = "/".join(
+        [github_config.api_url, "repos", owner, repo, "commits", commit_sha, "pulls"]
+    )
+
+    response = requests.get(search_url, headers=github_config.headers)
+    if response.status_code != 200:
+        return None
+
+    pulls = response.json()
+    if not pulls:
+        return None
+
+    # Return the first (most relevant) PR
+    pr = pulls[0]
+    return PullRequest(number=str(pr["number"]), title=pr["title"])
 
 
 def extract_changelog(pr_body):
@@ -206,8 +214,6 @@ def is_pr(message):
     """Determine whether or not a commit message is a PR merge"""
     return MERGE_PR_RE.search(message) or SQUASH_PR_RE.search(message)
 
-def is_release_merge(message):
-    return MERGE_RELEASE_PR_RE.search(message)
 
 def extract_pr(message):
     """Given a PR merge commit message, extract the PR number and title"""
@@ -231,19 +237,14 @@ def fetch_changes(
     previous_tag=None,
     current_tag=None,
     branch=DEFAULT_BRANCH,
-    ignore_release_merge=False,
 ):
     if previous_tag is None:
         previous_tag = get_last_tag(github_config, owner, repo)
-    previous_commit = get_commit_for_tag(
-        github_config, owner, repo, previous_tag
-    )
+    previous_commit = get_commit_for_tag(github_config, owner, repo, previous_tag)
 
     current_commit = None
     if current_tag is not None:
-        current_commit = get_commit_for_tag(
-            github_config, owner, repo, current_tag
-        )
+        current_commit = get_commit_for_tag(github_config, owner, repo, current_tag)
     else:
         current_commit = get_last_commit(github_config, owner, repo, branch)
 
@@ -252,19 +253,31 @@ def fetch_changes(
     )
 
     # Process the commit list looking for PR merges
-    prs = [extract_pr(c.message) for c in commits_between if is_pr(c.message) and (not ignore_release_merge or not is_release_merge(c.message))]
+    prs = []
+    processed_pr_numbers = set()  # Track PRs we've already processed
+
+    for commit in commits_between:
+        pr = None
+
+        # First try to extract PR from commit message (merge/squash patterns)
+        if is_pr(commit.message):
+            pr = extract_pr(commit.message)
+        else:
+            # For rebase merges, try to find PR via GitHub API
+            pr = get_pr_for_commit(github_config, owner, repo, commit.sha)
+
+        # Add PR if found and not already processed
+        if pr and pr.number not in processed_pr_numbers:
+            prs.append(pr)
+            processed_pr_numbers.add(pr.number)
 
     extended_prs = [
-        ExtendedPullRequest(
-            pr, get_pr_details(github_config, owner, repo, pr.number)
-        )
+        ExtendedPullRequest(pr, get_pr_details(github_config, owner, repo, pr.number))
         for pr in prs
     ]
 
     if len(extended_prs) == 0 and len(commits_between) > 0:
-        raise Exception(
-            "Lots of commits and no PRs on branch {}".format(branch)
-        )
+        raise Exception("Lots of commits and no PRs on branch {}".format(branch))
 
     extended_prs.reverse()
     return extended_prs
@@ -318,16 +331,10 @@ def generate_changelog(
     github_base_url=None,
     github_api_url=None,
     github_token=None,
-    ignore_release_merge=False,
 ):
+    github_config = get_github_config(github_base_url, github_api_url, github_token)
 
-    github_config = get_github_config(
-        github_base_url, github_api_url, github_token
-    )
-
-    prs = fetch_changes(
-        github_config, owner, repo, previous_tag, current_tag, branch, ignore_release_merge
-    )
+    prs = fetch_changes(github_config, owner, repo, previous_tag, current_tag, branch)
     lines = format_changes(github_config, owner, repo, prs, markdown=markdown)
 
     separator = "\\n" if single_line else "\n"
@@ -339,12 +346,8 @@ def main():
         description="Generate a CHANGELOG between two git tags based on GitHub"
         "Pull Request merge commit messages"
     )
-    parser.add_argument(
-        "owner", metavar="OWNER", help="owner of the repo on GitHub"
-    )
-    parser.add_argument(
-        "repo", metavar="REPO", help="name of the repo on GitHub"
-    )
+    parser.add_argument("owner", metavar="OWNER", help="owner of the repo on GitHub")
+    parser.add_argument("repo", metavar="REPO", help="name of the repo on GitHub")
     parser.add_argument(
         "previous_tag",
         metavar="PREVIOUS",
@@ -371,7 +374,7 @@ def main():
         type=str,
         action="store",
         default=DEFAULT_BRANCH,
-        help="Override the " "target branch (defaults to main)",
+        help="Override the target branch (defaults to main)",
     )
     parser.add_argument(
         "--github-base-url",
@@ -396,13 +399,7 @@ def main():
         type=str,
         action="store",
         default=None,
-        help="GitHub oauth token to auth " "your Github requests with",
-    )
-
-    parser.add_argument(
-        "--ignore-release-merge",
-        action="store_true",
-        help="Override if you don't want to add release merges on the changelog",
+        help="GitHub oauth token to auth your Github requests with",
     )
 
     args = parser.parse_args()
