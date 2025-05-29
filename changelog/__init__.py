@@ -26,6 +26,11 @@ ExtendedPullRequest = namedtuple("ExtendedPullRequest", ["pr", "details"])
 # Merge commits use a double linebreak between the branch name and the title
 MERGE_PR_RE = re.compile(r"^Merge pull request #([0-9]+) from .*\n\n(.*)")
 
+# Merge commits of a release branch
+MERGE_RELEASE_PR_RE = re.compile(
+    r"^Merge pull request #([0-9]+) from .*/release/.*\n\n(.*)"
+)
+
 # Squash-and-merge commits use the PR title with the number in parentheses
 SQUASH_PR_RE = re.compile(r"^(.*) \(#([0-9]+)\).*")
 
@@ -232,6 +237,11 @@ def is_pr(message):
     return MERGE_PR_RE.search(message) or SQUASH_PR_RE.search(message)
 
 
+def is_release_merge(message):
+    """Determine whether or not a commit message is a release merge"""
+    return MERGE_RELEASE_PR_RE.search(message)
+
+
 def extract_pr(message):
     """Given a PR merge commit message, extract the PR number and title"""
     merge_match = MERGE_PR_RE.match(message)
@@ -254,6 +264,7 @@ def fetch_changes(
     previous_tag=None,
     current_tag=None,
     branch=DEFAULT_BRANCH,
+    ignore_release_merge=False,
 ):
     if previous_tag is None:
         previous_tag = get_last_tag(github_config, owner, repo)
@@ -282,6 +293,9 @@ def fetch_changes(
 
         # First try to extract PR from commit message (merge/squash patterns)
         if is_pr(commit.message):
+            # Skip release merges if ignore_release_merge is True
+            if ignore_release_merge and is_release_merge(commit.message):
+                continue
             pr = extract_pr(commit.message)
         else:
             # For rebase merges, try to find PR via GitHub API
@@ -356,13 +370,20 @@ def generate_changelog(
     github_base_url=None,
     github_api_url=None,
     github_token=None,
+    ignore_release_merge=False,
 ):
     github_config = get_github_config(
         github_base_url, github_api_url, github_token
     )
 
     prs = fetch_changes(
-        github_config, owner, repo, previous_tag, current_tag, branch
+        github_config,
+        owner,
+        repo,
+        previous_tag,
+        current_tag,
+        branch,
+        ignore_release_merge,
     )
     lines = format_changes(github_config, owner, repo, prs, markdown=markdown)
 
@@ -433,6 +454,12 @@ def main():
         action="store",
         default=None,
         help="GitHub oauth token to auth your Github requests with",
+    )
+
+    parser.add_argument(
+        "--ignore-release-merge",
+        action="store_true",
+        help="Override if you don't want to add release merges on the changelog",
     )
 
     args = parser.parse_args()

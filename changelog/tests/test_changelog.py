@@ -67,7 +67,9 @@ class TestChangelog(TestCase):
             "object": {"type": "commit", "sha": "0123456789abcdef"}
         }
         mock_requests_get.return_value = response
-        result = get_commit_for_tag(fake_github_config, "someone", "one-repo", "mytag")
+        result = get_commit_for_tag(
+            fake_github_config, "someone", "one-repo", "mytag"
+        )
         self.assertEqual(result, "0123456789abcdef")
 
     @mock.patch("requests.get")
@@ -78,7 +80,9 @@ class TestChangelog(TestCase):
         response.json.return_value = {"message": "nope"}
         mock_requests_get.return_value = response
         with self.assertRaises(GitHubError):
-            get_commit_for_tag(fake_github_config, "someone", "one-repo", "mytag")
+            get_commit_for_tag(
+                fake_github_config, "someone", "one-repo", "mytag"
+            )
 
     @mock.patch("requests.get")
     def test_get_commit_for_tag_tag_object(self, mock_requests_get):
@@ -96,7 +100,9 @@ class TestChangelog(TestCase):
             {"object": {"type": "commit", "sha": "0123456789abcdef"}},
         ]
         mock_requests_get.return_value = response
-        result = get_commit_for_tag(fake_github_config, "someone", "one-repo", "mytag")
+        result = get_commit_for_tag(
+            fake_github_config, "someone", "one-repo", "mytag"
+        )
         self.assertEqual(result, "0123456789abcdef")
 
     @mock.patch("requests.get")
@@ -158,7 +164,9 @@ class TestChangelog(TestCase):
         response.json.return_value = {}
         mock_requests_get.return_value = response
         with self.assertRaises(GitHubError):
-            get_commits_between(fake_github_config, "someone", "one-repo", "one", "two")
+            get_commits_between(
+                fake_github_config, "someone", "one-repo", "one", "two"
+            )
 
     @mock.patch("requests.get")
     def test_get_commits_between_not_found(self, mock_requests_get):
@@ -168,7 +176,9 @@ class TestChangelog(TestCase):
         response.json.return_value = {"message": "nope"}
         mock_requests_get.return_value = response
         with self.assertRaises(GitHubError):
-            get_commits_between(fake_github_config, "someone", "one-repo", "one", "two")
+            get_commits_between(
+                fake_github_config, "someone", "one-repo", "one", "two"
+            )
 
     @mock.patch("requests.get")
     def test_get_pr_details(self, mock_requests_get):
@@ -271,7 +281,9 @@ class TestChangelog(TestCase):
                 PullRequest(2, "second"), PullRequestDetails(None, None)
             ),
         ]
-        actual = format_changes(github_config, "owner", "a-repo", prs, markdown=True)
+        actual = format_changes(
+            github_config, "owner", "a-repo", prs, markdown=True
+        )
         expected = [
             "MINOR RELEASE",
             "- first [#1](https://github.company.com/owner/a-repo/pull/1)",
@@ -395,13 +407,17 @@ class TestChangelog(TestCase):
         # For commit sha "8": "I made some changes!" - no PR associated
         get_pr_for_commit_response_8 = mock.MagicMock()
         get_pr_for_commit_response_8.status_code = 200
-        get_pr_for_commit_response_8.json.return_value = []  # Empty list means no PRs
+        get_pr_for_commit_response_8.json.return_value = (
+            []
+        )  # Empty list means no PRs
         responses.append(get_pr_for_commit_response_8)
 
         # For commit sha "7": malformed merge message - no PR associated
         get_pr_for_commit_response_7 = mock.MagicMock()
         get_pr_for_commit_response_7.status_code = 200
-        get_pr_for_commit_response_7.json.return_value = []  # Empty list means no PRs
+        get_pr_for_commit_response_7.json.return_value = (
+            []
+        )  # Empty list means no PRs
         responses.append(get_pr_for_commit_response_7)
 
         get_pr_details_response = mock.MagicMock()
@@ -475,7 +491,9 @@ class TestChangelog(TestCase):
         self.assertEqual(result.title, "Add new feature")
 
         # Verify the correct API endpoint was called
-        expected_url = "https://api.github.com/repos/owner/repo/commits/abc123/pulls"
+        expected_url = (
+            "https://api.github.com/repos/owner/repo/commits/abc123/pulls"
+        )
         mock_requests_get.assert_called_with(expected_url, headers={})
 
     @mock.patch("requests.get")
