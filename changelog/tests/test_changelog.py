@@ -12,6 +12,7 @@ from changelog import (
     PullRequest,
     PullRequestDetails,
     extract_pr,
+    fetch_changes,
     format_changes,
     generate_changelog,
     get_commit_for_tag,
@@ -19,6 +20,7 @@ from changelog import (
     get_github_config,
     get_last_commit,
     get_pr_details,
+    get_pr_for_commit,
     is_pr,
 )
 
@@ -452,3 +454,165 @@ class TestChangelog(TestCase):
                 "- Specific Changelog #10"
             ),
         )
+
+    @mock.patch("requests.get")
+    def test_get_pr_for_commit(self, mock_requests_get):
+        """Test getting PR for a commit using GitHub API"""
+        github_config = get_github_config(
+            PUBLIC_GITHUB_URL, PUBLIC_GITHUB_API_URL, token=None
+        )
+
+        # Test successful PR lookup
+        get_pr_for_commit_response = mock.MagicMock()
+        get_pr_for_commit_response.status_code = 200
+        get_pr_for_commit_response.json.return_value = [
+            {"number": 123, "title": "Add new feature"}
+        ]
+        mock_requests_get.return_value = get_pr_for_commit_response
+
+        result = get_pr_for_commit(github_config, "owner", "repo", "abc123")
+        self.assertEqual(result.number, "123")
+        self.assertEqual(result.title, "Add new feature")
+
+        # Verify the correct API endpoint was called
+        expected_url = "https://api.github.com/repos/owner/repo/commits/abc123/pulls"
+        mock_requests_get.assert_called_with(expected_url, headers={})
+
+    @mock.patch("requests.get")
+    def test_get_pr_for_commit_no_pr(self, mock_requests_get):
+        """Test getting PR for a commit when no PR is associated"""
+        github_config = get_github_config(
+            PUBLIC_GITHUB_URL, PUBLIC_GITHUB_API_URL, token=None
+        )
+
+        # Test empty response (no PRs)
+        get_pr_for_commit_response = mock.MagicMock()
+        get_pr_for_commit_response.status_code = 200
+        get_pr_for_commit_response.json.return_value = []
+        mock_requests_get.return_value = get_pr_for_commit_response
+
+        result = get_pr_for_commit(github_config, "owner", "repo", "abc123")
+        self.assertIsNone(result)
+
+    @mock.patch("requests.get")
+    def test_get_pr_for_commit_api_error(self, mock_requests_get):
+        """Test getting PR for a commit when API returns an error"""
+        github_config = get_github_config(
+            PUBLIC_GITHUB_URL, PUBLIC_GITHUB_API_URL, token=None
+        )
+
+        # Test API error
+        get_pr_for_commit_response = mock.MagicMock()
+        get_pr_for_commit_response.status_code = 404
+        mock_requests_get.return_value = get_pr_for_commit_response
+
+        result = get_pr_for_commit(github_config, "owner", "repo", "abc123")
+        self.assertIsNone(result)
+
+    @mock.patch("requests.get")
+    def test_fetch_changes_with_rebase_merge(self, mock_requests_get):
+        """Test fetch_changes with rebase merge commits"""
+        github_config = get_github_config(
+            PUBLIC_GITHUB_URL, PUBLIC_GITHUB_API_URL, token=None
+        )
+        responses = []
+
+        # Mock get_last_tag
+        get_last_tag_response = mock.MagicMock()
+        get_last_tag_response.status_code = 200
+        get_last_tag_response.json.return_value = [{"name": "v1.0.0"}]
+        responses.append(get_last_tag_response)
+
+        # Mock get_commit_for_tag
+        get_commit_for_tag_response = mock.MagicMock()
+        get_commit_for_tag_response.status_code = 200
+        get_commit_for_tag_response.json.return_value = {
+            "object": {"type": "commit", "sha": "tag_sha"}
+        }
+        responses.append(get_commit_for_tag_response)
+
+        # Mock get_last_commit
+        get_last_commit_response = mock.MagicMock()
+        get_last_commit_response.status_code = 200
+        get_last_commit_response.json.return_value = [{"sha": "head_sha"}]
+        responses.append(get_last_commit_response)
+
+        # Mock get_commits_between with rebase merge commits
+        get_commits_between_response = mock.MagicMock()
+        get_commits_between_response.status_code = 200
+        get_commits_between_response.json.return_value = {
+            "commits": [
+                {
+                    "sha": "commit1",
+                    "commit": {"message": "Fix bug in authentication"},
+                },
+                {
+                    "sha": "commit2",
+                    "commit": {"message": "Add unit tests"},
+                },
+                {
+                    "sha": "commit3",
+                    "commit": {"message": "Update documentation"},
+                },
+            ]
+        }
+        responses.append(get_commits_between_response)
+
+        # Mock get_pr_for_commit responses for rebase commits
+        # commit1 - associated with PR #100
+        get_pr_for_commit_response1 = mock.MagicMock()
+        get_pr_for_commit_response1.status_code = 200
+        get_pr_for_commit_response1.json.return_value = [
+            {"number": 100, "title": "Fix authentication bug"}
+        ]
+        responses.append(get_pr_for_commit_response1)
+
+        # commit2 - also associated with PR #100 (same PR, multiple commits)
+        get_pr_for_commit_response2 = mock.MagicMock()
+        get_pr_for_commit_response2.status_code = 200
+        get_pr_for_commit_response2.json.return_value = [
+            {"number": 100, "title": "Fix authentication bug"}
+        ]
+        responses.append(get_pr_for_commit_response2)
+
+        # commit3 - associated with PR #101
+        get_pr_for_commit_response3 = mock.MagicMock()
+        get_pr_for_commit_response3.status_code = 200
+        get_pr_for_commit_response3.json.return_value = [
+            {"number": 101, "title": "Documentation updates"}
+        ]
+        responses.append(get_pr_for_commit_response3)
+
+        # Mock get_pr_details for PR #100
+        get_pr_details_response1 = mock.MagicMock()
+        get_pr_details_response1.status_code = 200
+        get_pr_details_response1.json.return_value = {
+            "body": "Fixes authentication issue",
+            "labels": [{"name": "bug"}],
+        }
+        responses.append(get_pr_details_response1)
+
+        # Mock get_pr_details for PR #101
+        get_pr_details_response2 = mock.MagicMock()
+        get_pr_details_response2.status_code = 200
+        get_pr_details_response2.json.return_value = {
+            "body": "Updates documentation",
+            "labels": [{"name": "documentation"}],
+        }
+        responses.append(get_pr_details_response2)
+
+        mock_requests_get.side_effect = responses
+
+        result = fetch_changes(github_config, "owner", "repo")
+
+        # Should return 2 unique PRs (100 and 101), even though 3 commits were processed
+        self.assertEqual(len(result), 2)
+
+        # Check that we got the right PRs
+        pr_numbers = [pr.pr.number for pr in result]
+        self.assertIn("100", pr_numbers)
+        self.assertIn("101", pr_numbers)
+
+        # Check that PR #100 appears only once (deduplication worked)
+        self.assertEqual(pr_numbers.count("100"), 1)
+        self.assertEqual(pr_numbers.count("101"), 1)
