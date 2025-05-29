@@ -102,13 +102,17 @@ def get_commit_for_tag(github_config, owner, repo, tag):
 
 def get_last_commit(github_config, owner, repo, branch=DEFAULT_BRANCH):
     """Get the last commit sha for the given repo and branch"""
-    commits_url = "/".join([github_config.api_url, "repos", owner, repo, "commits"])
+    commits_url = "/".join(
+        [github_config.api_url, "repos", owner, repo, "commits"]
+    )
     commits_response = requests.get(
         commits_url, params={"sha": branch}, headers=github_config.headers
     )
     commits_json = commits_response.json()
     if commits_response.status_code != 200:
-        raise GitHubError("Unable to get commits. {}".format(commits_json["message"]))
+        raise GitHubError(
+            "Unable to get commits. {}".format(commits_json["message"])
+        )
 
     return commits_json[0]["sha"]
 
@@ -145,11 +149,14 @@ def get_commits_between(github_config, owner, repo, first_commit, last_commit):
 
     if "commits" not in commits_json:
         raise GitHubError(
-            "Commits not found between {} and {}.".format(first_commit, last_commit)
+            "Commits not found between {} and {}.".format(
+                first_commit, last_commit
+            )
         )
 
     commits = [
-        Commit(c["sha"], c["commit"]["message"]) for c in commits_json["commits"]
+        Commit(c["sha"], c["commit"]["message"])
+        for c in commits_json["commits"]
     ]
     return commits
 
@@ -170,7 +177,9 @@ def get_pr_details(github_config, owner, repo, pr_number):
     pr_json = pr_response.json()
     if pr_response.status_code != 200:
         raise GitHubError(
-            "Unable to get PR # {}. {}".format(pr_number, pr_response["message"])
+            "Unable to get PR # {}. {}".format(
+                pr_number, pr_response["message"]
+            )
         )
 
     labels = [label["name"] for label in pr_json["labels"]]
@@ -182,7 +191,15 @@ def get_pr_for_commit(github_config, owner, repo, commit_sha):
     """Get the PR associated with a commit using GitHub API"""
     # Search for PRs that contain this commit
     search_url = "/".join(
-        [github_config.api_url, "repos", owner, repo, "commits", commit_sha, "pulls"]
+        [
+            github_config.api_url,
+            "repos",
+            owner,
+            repo,
+            "commits",
+            commit_sha,
+            "pulls",
+        ]
     )
 
     response = requests.get(search_url, headers=github_config.headers)
@@ -240,11 +257,15 @@ def fetch_changes(
 ):
     if previous_tag is None:
         previous_tag = get_last_tag(github_config, owner, repo)
-    previous_commit = get_commit_for_tag(github_config, owner, repo, previous_tag)
+    previous_commit = get_commit_for_tag(
+        github_config, owner, repo, previous_tag
+    )
 
     current_commit = None
     if current_tag is not None:
-        current_commit = get_commit_for_tag(github_config, owner, repo, current_tag)
+        current_commit = get_commit_for_tag(
+            github_config, owner, repo, current_tag
+        )
     else:
         current_commit = get_last_commit(github_config, owner, repo, branch)
 
@@ -272,12 +293,16 @@ def fetch_changes(
             processed_pr_numbers.add(pr.number)
 
     extended_prs = [
-        ExtendedPullRequest(pr, get_pr_details(github_config, owner, repo, pr.number))
+        ExtendedPullRequest(
+            pr, get_pr_details(github_config, owner, repo, pr.number)
+        )
         for pr in prs
     ]
 
     if len(extended_prs) == 0 and len(commits_between) > 0:
-        raise Exception("Lots of commits and no PRs on branch {}".format(branch))
+        raise Exception(
+            "Lots of commits and no PRs on branch {}".format(branch)
+        )
 
     extended_prs.reverse()
     return extended_prs
@@ -332,9 +357,13 @@ def generate_changelog(
     github_api_url=None,
     github_token=None,
 ):
-    github_config = get_github_config(github_base_url, github_api_url, github_token)
+    github_config = get_github_config(
+        github_base_url, github_api_url, github_token
+    )
 
-    prs = fetch_changes(github_config, owner, repo, previous_tag, current_tag, branch)
+    prs = fetch_changes(
+        github_config, owner, repo, previous_tag, current_tag, branch
+    )
     lines = format_changes(github_config, owner, repo, prs, markdown=markdown)
 
     separator = "\\n" if single_line else "\n"
@@ -346,8 +375,12 @@ def main():
         description="Generate a CHANGELOG between two git tags based on GitHub"
         "Pull Request merge commit messages"
     )
-    parser.add_argument("owner", metavar="OWNER", help="owner of the repo on GitHub")
-    parser.add_argument("repo", metavar="REPO", help="name of the repo on GitHub")
+    parser.add_argument(
+        "owner", metavar="OWNER", help="owner of the repo on GitHub"
+    )
+    parser.add_argument(
+        "repo", metavar="REPO", help="name of the repo on GitHub"
+    )
     parser.add_argument(
         "previous_tag",
         metavar="PREVIOUS",

@@ -7,10 +7,10 @@ import mock
 from changelog import (
     PUBLIC_GITHUB_API_URL,
     PUBLIC_GITHUB_URL,
-    GitHubError,
     ExtendedPullRequest,
-    PullRequestDetails,
+    GitHubError,
     PullRequest,
+    PullRequestDetails,
     extract_pr,
     format_changes,
     generate_changelog,
@@ -21,7 +21,6 @@ from changelog import (
     get_pr_details,
     is_pr,
 )
-
 
 fake_github_config = get_github_config(
     PUBLIC_GITHUB_URL, PUBLIC_GITHUB_API_URL, "fake-github-token"
@@ -66,9 +65,7 @@ class TestChangelog(TestCase):
             "object": {"type": "commit", "sha": "0123456789abcdef"}
         }
         mock_requests_get.return_value = response
-        result = get_commit_for_tag(
-            fake_github_config, "someone", "one-repo", "mytag"
-        )
+        result = get_commit_for_tag(fake_github_config, "someone", "one-repo", "mytag")
         self.assertEqual(result, "0123456789abcdef")
 
     @mock.patch("requests.get")
@@ -79,9 +76,7 @@ class TestChangelog(TestCase):
         response.json.return_value = {"message": "nope"}
         mock_requests_get.return_value = response
         with self.assertRaises(GitHubError):
-            get_commit_for_tag(
-                fake_github_config, "someone", "one-repo", "mytag"
-            )
+            get_commit_for_tag(fake_github_config, "someone", "one-repo", "mytag")
 
     @mock.patch("requests.get")
     def test_get_commit_for_tag_tag_object(self, mock_requests_get):
@@ -99,9 +94,7 @@ class TestChangelog(TestCase):
             {"object": {"type": "commit", "sha": "0123456789abcdef"}},
         ]
         mock_requests_get.return_value = response
-        result = get_commit_for_tag(
-            fake_github_config, "someone", "one-repo", "mytag"
-        )
+        result = get_commit_for_tag(fake_github_config, "someone", "one-repo", "mytag")
         self.assertEqual(result, "0123456789abcdef")
 
     @mock.patch("requests.get")
@@ -163,9 +156,7 @@ class TestChangelog(TestCase):
         response.json.return_value = {}
         mock_requests_get.return_value = response
         with self.assertRaises(GitHubError):
-            get_commits_between(
-                fake_github_config, "someone", "one-repo", "one", "two"
-            )
+            get_commits_between(fake_github_config, "someone", "one-repo", "one", "two")
 
     @mock.patch("requests.get")
     def test_get_commits_between_not_found(self, mock_requests_get):
@@ -175,9 +166,7 @@ class TestChangelog(TestCase):
         response.json.return_value = {"message": "nope"}
         mock_requests_get.return_value = response
         with self.assertRaises(GitHubError):
-            get_commits_between(
-                fake_github_config, "someone", "one-repo", "one", "two"
-            )
+            get_commits_between(fake_github_config, "someone", "one-repo", "one", "two")
 
     @mock.patch("requests.get")
     def test_get_pr_details(self, mock_requests_get):
@@ -280,9 +269,7 @@ class TestChangelog(TestCase):
                 PullRequest(2, "second"), PullRequestDetails(None, None)
             ),
         ]
-        actual = format_changes(
-            github_config, "owner", "a-repo", prs, markdown=True
-        )
+        actual = format_changes(github_config, "owner", "a-repo", prs, markdown=True)
         expected = [
             "MINOR RELEASE",
             "- first [#1](https://github.company.com/owner/a-repo/pull/1)",
@@ -316,8 +303,7 @@ class TestChangelog(TestCase):
             {
                 "sha": "10",
                 "commit": {
-                    "message": "Merge pull request #1234 from some/branch"
-                    "\n\nMy Title"
+                    "message": "Merge pull request #1234 from some/branch\n\nMy Title"
                 },
             },
             {
@@ -331,8 +317,7 @@ class TestChangelog(TestCase):
             {
                 "sha": "7",
                 "commit": {
-                    "message": "Merge pull request from some/branch"
-                    "\n\nMy Title"
+                    "message": "Merge pull request from some/branch\n\nMy Title"
                 },
             },
             {
@@ -342,8 +327,7 @@ class TestChangelog(TestCase):
             {
                 "sha": "5",
                 "commit": {
-                    "message": "Merge pull request #1234 from some/branch"
-                    "\n\nMy Title"
+                    "message": "Merge pull request #1234 from some/branch\n\nMy Title"
                 },
             },
             {
@@ -357,8 +341,7 @@ class TestChangelog(TestCase):
             {
                 "sha": "2",
                 "commit": {
-                    "message": "Merge pull request from some/branch"
-                    "\n\nMy Title"
+                    "message": "Merge pull request from some/branch\n\nMy Title"
                 },
             },
             {
@@ -375,8 +358,7 @@ class TestChangelog(TestCase):
                 {
                     "sha": "10",
                     "commit": {
-                        "message": "Merge pull request #10 from some/branch"
-                        "\n\nMy Title"
+                        "message": "Merge pull request #10 from some/branch\n\nMy Title"
                     },
                 },
                 {
@@ -390,8 +372,7 @@ class TestChangelog(TestCase):
                 {
                     "sha": "7",
                     "commit": {
-                        "message": "Merge pull request from some/branch"
-                        "\n\nMy Title"
+                        "message": "Merge pull request from some/branch\n\nMy Title"
                     },
                 },
                 {
@@ -401,13 +382,25 @@ class TestChangelog(TestCase):
                 {
                     "sha": "5",
                     "commit": {
-                        "message": "Merge pull request #5 from some/branch"
-                        "\n\nMy Title"
+                        "message": "Merge pull request #5 from some/branch\n\nMy Title"
                     },
                 },
             ]
         }
         responses.append(get_commits_between_response)
+
+        # Mock API calls for get_pr_for_commit for commits that don't match PR patterns
+        # For commit sha "8": "I made some changes!" - no PR associated
+        get_pr_for_commit_response_8 = mock.MagicMock()
+        get_pr_for_commit_response_8.status_code = 200
+        get_pr_for_commit_response_8.json.return_value = []  # Empty list means no PRs
+        responses.append(get_pr_for_commit_response_8)
+
+        # For commit sha "7": malformed merge message - no PR associated
+        get_pr_for_commit_response_7 = mock.MagicMock()
+        get_pr_for_commit_response_7.status_code = 200
+        get_pr_for_commit_response_7.json.return_value = []  # Empty list means no PRs
+        responses.append(get_pr_for_commit_response_7)
 
         get_pr_details_response = mock.MagicMock()
         get_pr_details_response.status_code = 200
