@@ -1,6 +1,5 @@
 from setuptools import find_packages, setup
 
-
 with open("README.md") as f:
     long_description = f.read()
 
@@ -26,7 +25,6 @@ setup(
             "flake8>=2.2.0",
         ],
     },
-    test_suite="changelog.tests",
     entry_points={
         "console_scripts": [
             "changelog = changelog:main",
