@@ -27,9 +27,7 @@ ExtendedPullRequest = namedtuple("ExtendedPullRequest", ["pr", "details"])
 MERGE_PR_RE = re.compile(r"^Merge pull request #([0-9]+) from .*\n\n(.*)")
 
 # Merge commits of a release branch
-MERGE_RELEASE_PR_RE = re.compile(
-    r"^Merge pull request #([0-9]+) from .*/release/.*\n\n(.*)"
-)
+MERGE_RELEASE_PR_RE = r"^Merge pull request #([0-9]+) from .*/release/.*\n\n(.*)"
 
 # Squash-and-merge commits use the PR title with the number in parentheses
 SQUASH_PR_RE = re.compile(r"^(.*) \(#([0-9]+)\).*")
@@ -42,6 +40,7 @@ LABEL_LEVELS = {
     "patch": 3,
     "hotfix": 3,
     "fix": 3,
+    "bug": 3,
     "minor": 2,
     "feature": 2,
     "breaking": 1,
@@ -237,9 +236,9 @@ def is_pr(message):
     return MERGE_PR_RE.search(message) or SQUASH_PR_RE.search(message)
 
 
-def is_release_merge(message):
-    """Determine whether or not a commit message is a release merge"""
-    return MERGE_RELEASE_PR_RE.search(message)
+def matches_pattern(message,  pattern):
+    """Determine whether or not a commit message matches a pattern"""
+    return re.compile(pattern).search(message)
 
 
 def extract_pr(message):
@@ -264,7 +263,7 @@ def fetch_changes(
     previous_tag=None,
     current_tag=None,
     branch=DEFAULT_BRANCH,
-    ignore_release_merge=False,
+    ignore_pr_patterns=[MERGE_RELEASE_PR_RE],
 ):
     if previous_tag is None:
         previous_tag = get_last_tag(github_config, owner, repo)
@@ -293,8 +292,8 @@ def fetch_changes(
 
         # First try to extract PR from commit message (merge/squash patterns)
         if is_pr(commit.message):
-            # Skip release merges if ignore_release_merge is True
-            if ignore_release_merge and is_release_merge(commit.message):
+            # Skip release merges if ignore_pr_patterns is set
+            if ignore_pr_patterns and any(matches_pattern(commit.message, pattern) for pattern in ignore_pr_patterns):
                 continue
             pr = extract_pr(commit.message)
         else:
@@ -370,7 +369,7 @@ def generate_changelog(
     github_base_url=None,
     github_api_url=None,
     github_token=None,
-    ignore_release_merge=False,
+    ignore_pr_patterns=[],
 ):
     github_config = get_github_config(
         github_base_url, github_api_url, github_token
@@ -383,7 +382,7 @@ def generate_changelog(
         previous_tag,
         current_tag,
         branch,
-        ignore_release_merge,
+        ignore_pr_patterns,
     )
     lines = format_changes(github_config, owner, repo, prs, markdown=markdown)
 
@@ -457,9 +456,11 @@ def main():
     )
 
     parser.add_argument(
-        "--ignore-release-merge",
-        action="store_true",
-        help="Override if you don't want to add release merges on the changelog",
+        "--ignore-pr-patterns",
+        nargs="*",
+        type=str,
+        default=[MERGE_RELEASE_PR_RE],
+        help="List of PR patterns to ignore in the changelog (e.g., release hotfix)",
     )
 
     args = parser.parse_args()
